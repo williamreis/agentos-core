@@ -1,0 +1,60 @@
+services:
+  api:
+    build: .
+    image: agentos-core:local
+    container_name: agentos-api
+    command:
+      - uvicorn
+      - main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "${API_CONTAINER_PORT:-8000}"
+      - --reload
+      - --reload-dir
+      - /app
+      - --reload-exclude
+      - "**/__pycache__/**"
+      - --reload-exclude
+      - "**/*.pyc"
+    ports:
+      - "${API_PORT:-8000}:${API_CONTAINER_PORT:-8000}"
+    volumes:
+      - .:/app
+    environment:
+      AUTH_ENABLED: "${AUTH_ENABLED:-true}"
+      FRAUD_API_KEY: ${FRAUD_API_KEY:-dev-fraud-key}
+      FAQ_API_KEY: ${FAQ_API_KEY:-dev-faq-key}
+      API_CONTAINER_PORT: "${API_CONTAINER_PORT:-8000}"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'python -c "import os,urllib.request; urllib.request.urlopen(\"http://127.0.0.1:\"+os.environ[\"API_CONTAINER_PORT\"]+\"/health\")"',
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
+
+  ui:
+    image: agentos-core:local
+    build: .
+    container_name: agentos-ui
+    command:
+      - streamlit
+      - run
+      - ui/app.py
+      - --server.port=${UI_CONTAINER_PORT:-8501}
+      - --server.address=0.0.0.0
+      - --server.headless=true
+    ports:
+      - "${UI_PORT:-8501}:${UI_CONTAINER_PORT:-8501}"
+    environment:
+      STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
+    volumes:
+      - .:/app
+    working_dir: /app
+    depends_on:
+      api:
+        condition: service_healthy
